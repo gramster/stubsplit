@@ -1,6 +1,18 @@
 import os
 
 
+# TODO: 
+# - rewrite these as FSMs; will probably be cleaner and more 
+#   maintainable long-term. Right now split() uses a for-in
+#   loop which requires buffering some past content. For merge
+#   I used indexing instead which avoided that, but it does
+#   mix metaphors; using FSMs for both could be more consistent
+#   and possible reuse the same 'driver' for both.
+# - handle nested classes. This isn't urgent as we likely won't 
+#   have any docstrings in these, but we should at least not
+#   break.
+
+
 def split(stubroot, docroot, fname):
     """
     Given the path to a .pyi file in `fname` as a path relative to `stubroot`,
@@ -31,13 +43,11 @@ def split(stubroot, docroot, fname):
     target = newstublines
     gotclose = False
 
-    # TODO: handle nested classes eventually (right now we have no docstrings for
-    #    these so not urgent)
     # TODO: handle split lines. This is more urgent as the stubs will likely be 
     #    reformatted.
     for line in stublines:
         ls = line.strip()
-        if defbuff:
+        if defbuff and defbuff.find(')') > 0:
             if ls[:3] == "'''" or ls[:3] == '"""':  # start of docstring
                 if classbuff and defbuff[0] == ' ':
                     newdoclines.append('\n')
@@ -60,20 +70,19 @@ def split(stubroot, docroot, fname):
                 gotclose = ls == "'''" or ls == '"""'
         elif ls[:4] == 'def ':
             defbuff = line
+        elif defbuff and defbuff.find(')') < 0: # Handle split lines; is this enough?
+            defbuff += line
         else:
-            if ls[:6] == 'class ':
+            # For now we handle top-level classes only
+            if line[:6] == 'class ':
                 classbuff = line
             newstublines.append(line)
 
-    
     with open(stubfile, 'w') as f:
         f.writelines(newstublines)
 
     with open(docfile, 'w') as f:
         f.writelines(newdoclines)
-        print('OUTPUT DOC:\n=====\n')
-        print(''.join(newdoclines))
-        print('=====\n')
 
 
 def combine(stubroot, docroot, fname):
@@ -136,7 +145,6 @@ def combine(stubroot, docroot, fname):
     # Now output the new stub lines. If we find a top-level method
     # or class that is in our gathered data, substitute the original
     # line for the gathered version.
-    # TODO: again, this may get complicated later by folded lines.
 
     newstublines = []
 
@@ -160,6 +168,10 @@ def combine(stubroot, docroot, fname):
                     name = ls[4:ls.find('(')]
                     if name in methods:
                         newstublines.extend(methods[name])
+                        # If split line skip rest 
+                        while ln.find(')') < 0:
+                            ln = stublines[i]
+                            i += 1
                     else:
                         newstublines.append(ln)
                 else:

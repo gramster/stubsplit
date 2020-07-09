@@ -33,6 +33,29 @@ class B:
         This is the doc
         '''
         pass
+
+def three(a, b,
+    c):
+    \"\"\"
+    This is
+    the doc
+    \"\"\"
+    pass
+
+def four(a, b,
+    c) -> Any: ...
+
+class C:
+
+    def four(a, b,
+        c) -> Any: ...
+    def three(a, b,
+        c):
+        \"\"\"
+        This is
+        the doc
+        \"\"\"
+        pass
 """
         )
     yield stubpath, docpath, stubname
@@ -46,7 +69,7 @@ def test_split_stub(simplestub):
     stubsplit.split(stubroot, docroot, fname)
 
     with open(os.path.join(stubroot, fname)) as f:
-        assert f.read() == """
+        assert_that(f.read(), equal_to("""
 def one(): ...
 def two(): ...
 
@@ -55,7 +78,20 @@ class A:
 
 class B:
     def two(): ...
-"""
+
+def three(a, b,
+    c): ...
+
+def four(a, b,
+    c) -> Any: ...
+
+class C:
+
+    def four(a, b,
+        c) -> Any: ...
+    def three(a, b,
+        c): ...
+"""))
 
 def test_split_doc(simplestub):
     (stubroot, docroot, fname) = simplestub
@@ -74,5 +110,21 @@ class B:
         '''
         This is the doc
         '''
+        pass
+def three(a, b,
+    c):
+    \"\"\"
+    This is
+    the doc
+    \"\"\"
+    pass
+
+class C:
+    def three(a, b,
+        c):
+        \"\"\"
+        This is
+        the doc
+        \"\"\"
         pass
 """))
