@@ -30,6 +30,11 @@ def split(stubroot, docroot, fname):
     indoc = False
     target = newstublines
     gotclose = False
+
+    # TODO: handle nested classes eventually (right now we have no docstrings for
+    #    these so not urgent)
+    # TODO: handle split lines. This is more urgent as the stubs will likely be 
+    #    reformatted.
     for line in stublines:
         ls = line.strip()
         if defbuff:
@@ -91,7 +96,84 @@ def combine(stubroot, docroot, fname):
     with open(docfile) as f:
         doclines = f.readlines()
 
+    # Gather together all the top-level functions and all the classes
+    # in dicts. That way we can be resilient to reorderings, if not
+    # file moves yet.
+
+    def gather_def(lines, i):
+        ln = lines[i].strip()
+        name = ln[4:ln.find('(')]
+        start = i
+        i += 1
+        while i < len(lines):
+            ln = lines[i].strip()
+            i += 1
+            if ln == 'pass':
+                break
+        return name, lines[start:i], i
+
+    top_level = {}
+    classes = {}
+    i = 0
+    while i < len(doclines):
+        ln = doclines[i]
+        if ln[:6] == 'class ':
+            name = ln[6:min(ln.find('('), ln.find(':'))]
+            i += 1
+            methods = {}
+            classes[name] = methods
+            while i < len(doclines) and doclines[i][0] == ' ':
+                name, deflines, i = gather_def(doclines, i)
+                methods[name] = deflines
+        elif ln[:4] == 'def ':
+            name, deflines, i = gather_def(doclines, i)
+            top_level[name] = deflines
+        elif len(ln.strip()) > 0:
+            raise Exception(f'Unhandled line {i}: "{ln}"')
+        else:
+            i += 1
+
+    # Now output the new stub lines. If we find a top-level method
+    # or class that is in our gathered data, substitute the original
+    # line for the gathered version.
+    # TODO: again, this may get complicated later by folded lines.
+
     newstublines = []
 
+    i = 0
+    while i < len(stublines):
+        ln = stublines[i]
+        i += 1
+        if ln[:6] == 'class ':
+            name = ln[6:min(ln.find('('), ln.find(':'))]
+            methods = classes[name] if name in classes else {}
+            newstublines.append(ln)
+            while i < len(stublines):
+                # Either we have a indented line or a top-level
+                # construct again
+                ln = stublines[i]
+                if ln[0] != ' ':
+                    break
+                i += 1
+                ls = ln.strip()
+                if ls[:4] == 'def ':
+                    name = ls[4:ls.find('(')]
+                    if name in methods:
+                        newstublines.extend(methods[name])
+                    else:
+                        newstublines.append(ln)
+                else:
+                    newstublines.append(ln)
+        elif ln[:4] == 'def ':
+            name = ln[4:ln.find('(')]
+            if name in top_level:
+                newstublines.extend(top_level[name])
+            else:
+                newstublines.append(ln)
+        else:
+            newstublines.append(ln)
+
+    with open(stubfile, 'w') as f:
+        f.writelines(newstublines)
 
 
