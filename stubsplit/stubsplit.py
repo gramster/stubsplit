@@ -70,7 +70,7 @@ def split(stubroot, docroot, fname):
             if gotclose and ls == 'pass': 
                 indoc = False
             else:
-                gotclose = ls == "'''" or ls == '"""'
+                gotclose = ls.find( "'''") >= 0 or ls.find('"""') >= 0
         elif ls[:4] == 'def ':
             defbuff = line
         elif defbuff and defbuff.find(')') < 0: # Handle split lines; is this enough?
@@ -181,14 +181,18 @@ def combine(stubroot, docroot, fname):
                     if name in methods:
                         # in case this is an overload, document same occurrence
                         lines = methods[name]
-                        if ln[:ln.find(')')] == lines[0][:lines[0].find(')')]:
+                        j = -1
+                        while stublines[i + j].find(')') < 0: # Check all lines of signature for match
+                            if stublines[i + j] != lines[j + 1]:
+                                break
+                            j += 1
+                        # For last line of signature, stop matching at closing ')'
+                        if stublines[i + j][:stublines[i + j].find(')')] == lines[j + 1][:lines[j + 1].find(')')]:
                             print(f"    Annotating method {name}")
                             newstublines.extend(lines)
                             del methods[name]  # Only doc first occurrence
-                            # If split line skip rest 
-                            while ln.find(')') < 0:
-                                ln = stublines[i]
-                                i += 1
+                            # If split line skip rest of signature
+                            i += j + 1
                         else:
                             newstublines.append(ln)
                     else:
@@ -200,6 +204,9 @@ def combine(stubroot, docroot, fname):
             if name in top_level:
                 print(f"Annotating function {name}")
                 newstublines.extend(top_level[name])
+                while ln.find(')') < 0: # If wrapped we need to skip the rest of the signature
+                    ln = stublines[i]
+                    i += 1
                 del top_level[name]
             else:
                 newstublines.append(ln)
