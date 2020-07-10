@@ -31,6 +31,9 @@ def split(stubroot, docroot, fname):
     """
     stubfile = os.path.join(stubroot, fname)
     docfile = os.path.join(docroot, fname) + '.ds'
+    docpath, _ = os.path.split(docfile)
+    if not os.path.exists(docpath):
+        os.makedirs(docpath)
     if not os.path.exists(stubfile):
         raise Exception(f'Missing stub file {fname}')
     with open(stubfile) as f:
@@ -78,11 +81,15 @@ def split(stubroot, docroot, fname):
                 classbuff = line
             newstublines.append(line)
 
+    if defbuff:
+        newstublines.append(defbuff)
+
     with open(stubfile, 'w') as f:
         f.writelines(newstublines)
 
     with open(docfile, 'w') as f:
-        f.writelines(newdoclines)
+        if len(newdoclines):
+            f.writelines(newdoclines)
 
 
 def combine(stubroot, docroot, fname):
@@ -104,6 +111,9 @@ def combine(stubroot, docroot, fname):
         stublines = f.readlines()
     with open(docfile) as f:
         doclines = f.readlines()
+    if len(doclines) == 0:
+        return
+    print(f'Merging docs from {docfile} into {stubfile}')
 
     # Gather together all the top-level functions and all the classes
     # in dicts. That way we can be resilient to reorderings, if not
@@ -155,23 +165,32 @@ def combine(stubroot, docroot, fname):
         if ln[:6] == 'class ':
             name = ln[6:min(ln.find('('), ln.find(':'))]
             methods = classes[name] if name in classes else {}
+            if methods.keys():
+                print(f"Annotating class {name}")
             newstublines.append(ln)
             while i < len(stublines):
                 # Either we have a indented line or a top-level
                 # construct again
                 ln = stublines[i]
-                if ln[0] != ' ':
+                if ln[0].isalpha() or ln[0] == '@':
                     break
                 i += 1
                 ls = ln.strip()
                 if ls[:4] == 'def ':
                     name = ls[4:ls.find('(')]
                     if name in methods:
-                        newstublines.extend(methods[name])
-                        # If split line skip rest 
-                        while ln.find(')') < 0:
-                            ln = stublines[i]
-                            i += 1
+                        # in case this is an overload, document same occurrence
+                        lines = methods[name]
+                        if ln[:ln.find(')')] == lines[0][:lines[0].find(')')]:
+                            print(f"    Annotating method {name}")
+                            newstublines.extend(lines)
+                            del methods[name]  # Only doc first occurrence
+                            # If split line skip rest 
+                            while ln.find(')') < 0:
+                                ln = stublines[i]
+                                i += 1
+                        else:
+                            newstublines.append(ln)
                     else:
                         newstublines.append(ln)
                 else:
@@ -179,7 +198,9 @@ def combine(stubroot, docroot, fname):
         elif ln[:4] == 'def ':
             name = ln[4:ln.find('(')]
             if name in top_level:
+                print(f"Annotating function {name}")
                 newstublines.extend(top_level[name])
+                del top_level[name]
             else:
                 newstublines.append(ln)
         else:
@@ -187,5 +208,3 @@ def combine(stubroot, docroot, fname):
 
     with open(stubfile, 'w') as f:
         f.writelines(newstublines)
-
-
