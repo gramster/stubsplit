@@ -179,7 +179,17 @@ def combine(stubroot, docroot, fname):
                 if ls[:4] == 'def ':
                     name = ls[4:ls.find('(')]
                     if name in methods:
-                        # in case this is an overload, document same occurrence
+                        # in case this is an overload, document same occurrence. To do that we need to 
+                        # do a full signature comparison which may span several lines.
+                        # Note that this is not robust in the face of running formatters with
+                        # different line lengths. We should really reconstruct the signature line
+                        # ourselves with normalized formatting. Ain't nobody got time for that.
+                        # Given Python functions are not polymorphic and so the names should be
+                        # unique (ignoring @overloads), a better approach would be to change 
+                        # the split process so that it drops signatures and just stores function name
+                        # or classname.methodname keys along with the docstrings, and then we can 
+                        # just reinsert those ourselves on the first instance we find, instead of
+                        # matching the exact instance.
                         lines = methods[name]
                         j = -1
                         while stublines[i + j].find(')') < 0: # Check all lines of signature for match
