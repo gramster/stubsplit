@@ -2,18 +2,13 @@ import os
 
 
 # TODO: 
-# - rewrite these as FSMs; will probably be cleaner and more 
-#   maintainable long-term. Right now split() uses a for-in
-#   loop which requires buffering some past content. For merge
-#   I used indexing instead which avoided that, but it does
-#   mix metaphors; using FSMs for both could be more consistent
-#   and possible reuse the same 'driver' for both.
+# - rewrite these with libcst
 # - handle nested classes. This isn't urgent as we likely won't 
 #   have any docstrings in these, but we should at least not
 #   break.
 
 
-def split(stubroot, docroot, fname, verbose):
+def split(stubroot, docroot, fname, verbose=False):
     """
     Given the path to a .pyi file in `fname` as a path relative to `stubroot`,
     split it into a docstring part and a stub part. The stub part should get 
@@ -92,7 +87,7 @@ def split(stubroot, docroot, fname, verbose):
             f.writelines(newdoclines)
 
 
-def combine(stubroot, docroot, fname, verbose):
+def combine(stubroot, docroot, fname, verbose=False):
     """
     Given the path to a .pyi file in `fname` as a path relative to `origroot`,
     and given that a similar file exists under `docroot` with the same relative
