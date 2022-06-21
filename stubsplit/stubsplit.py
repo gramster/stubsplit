@@ -13,7 +13,7 @@ import os
 #   break.
 
 
-def split(stubroot, docroot, fname):
+def split(stubroot, docroot, fname, verbose):
     """
     Given the path to a .pyi file in `fname` as a path relative to `stubroot`,
     split it into a docstring part and a stub part. The stub part should get 
@@ -87,12 +87,12 @@ def split(stubroot, docroot, fname):
     with open(stubfile, 'w') as f:
         f.writelines(newstublines)
 
-    with open(docfile, 'w') as f:
-        if len(newdoclines):
+    if len(newdoclines):
+        with open(docfile, 'w') as f:
             f.writelines(newdoclines)
 
 
-def combine(stubroot, docroot, fname):
+def combine(stubroot, docroot, fname, verbose):
     """
     Given the path to a .pyi file in `fname` as a path relative to `origroot`,
     and given that a similar file exists under `docroot` with the same relative
@@ -112,12 +112,14 @@ def combine(stubroot, docroot, fname):
     with open(docfile) as f:
         doclines = f.readlines()
     if len(doclines) == 0:
+        print(f'No docs found in {docfile}')
         return
-    print(f'Merging docs from {docfile} into {stubfile}')
 
     # Gather together all the top-level functions and all the classes
     # in dicts. That way we can be resilient to reorderings, if not
     # file moves yet.
+    if verbose:
+        print(f'Gathering docs from {docfile}')
 
     def gather_def(lines, i):
         ln = lines[i].strip()
@@ -141,12 +143,18 @@ def combine(stubroot, docroot, fname):
             i += 1
             methods = {}
             classes[name] = methods
+            if verbose:
+                print(f'{i+1}: class {name}')
             while i < len(doclines) and doclines[i][0] == ' ':
                 name, deflines, i = gather_def(doclines, i)
                 methods[name] = deflines
+                if verbose:
+                    print(f'{i+1}:     def {name}')
         elif ln[:4] == 'def ':
             name, deflines, i = gather_def(doclines, i)
             top_level[name] = deflines
+            if verbose:
+                print(f'{i+1}: def {name}')
         elif len(ln.strip()) > 0:
             raise Exception(f'Unhandled line {i}: "{ln}"')
         else:
@@ -156,6 +164,7 @@ def combine(stubroot, docroot, fname):
     # or class that is in our gathered data, substitute the original
     # line for the gathered version.
 
+    print(f'Merging docs from {docfile} into {stubfile}')
     newstublines = []
 
     i = 0
@@ -167,6 +176,8 @@ def combine(stubroot, docroot, fname):
             methods = classes[name] if name in classes else {}
             if methods.keys():
                 print(f"Annotating class {name}")
+            elif verbose:
+                print(f'No methods found for class {name}')
             newstublines.append(ln)
             while i < len(stublines):
                 # Either we have a indented line or a top-level
